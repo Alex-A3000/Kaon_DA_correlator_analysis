@@ -20,7 +20,8 @@ from scipy.linalg import pinv
 warnings.filterwarnings("ignore")
 
 def progress_bar(progress, total, length=40):
-    percent = 100 * ((progress + 1) / float(total))
+    progress = progress + 1
+    percent = 100 * (progress / float(total))
     bar = '█' * int(length * progress // total) + '-' * (length - int(length * progress // total))
     sys.stdout.write(f'\r|{bar}| {percent:.2f}%')
     sys.stdout.flush()
@@ -89,7 +90,7 @@ def hadronic_tensor(dir_3pt, kappa_l, kappa_s, kappa_h, Nconf, Lt, tau_es, two_p
         for n_f in range(4):
             data_15 = Cut_conf(np.loadtxt(dir_3pt + filename15[n_f]), Lt)[:,:,1] * reweightingfactors.reshape((Nconf,1))
             data_7  = Cut_conf(np.loadtxt(dir_3pt + filename7[n_f]), Lt)[:,:,1] * reweightingfactors.reshape((Nconf,1))
-            data_f = -abs(A)*data_7 + abs(B)*data_15 
+            data_f = abs(A)*data_7 + abs(B)*data_15 
             C[n_t,n_f,:] = np.mean(data_15,0)
             C_b[n_t,n_f,:,:] = data_15
             R[n_t,n_f,:] = R_uv(np.mean(data_f,0), Ek, Zk, tau_e, Lt)
@@ -155,8 +156,8 @@ def hadronic_tensor_exc(fun, Ntau, dir_3pt, kappa_l, kappa_s, kappa_h, Nconf, Lt
             "3pt_" + create_3pt_name(kappa_l, kappa_s,"s-l", kappa_h, g_k, tau_e, "ge-14-gm-13", (0,0,1), (1,0,-1)),
             "3pt_" + create_3pt_name(kappa_l, kappa_s,"s-l", kappa_h, g_k, tau_e, "ge-14-gm-13", (1,0,-1), (0,0,1)),
             ]
-            data_15 = Cut_conf(np.loadtxt(dir_3pt + filename15[n_f]), Lt)[:,:,1] #* reweightingfactors.reshape((Nconf,1))
-            data_7  = Cut_conf(np.loadtxt(dir_3pt + filename7[n_f]), Lt)[:,:,1] #* reweightingfactors.reshape((Nconf,1))
+            data_15 = Cut_conf(np.loadtxt(dir_3pt + filename15[n_f]), Lt)[:,:,1] * reweightingfactors.reshape((Nconf,1))
+            data_7  = Cut_conf(np.loadtxt(dir_3pt + filename7[n_f]), Lt)[:,:,1] * reweightingfactors.reshape((Nconf,1))
             data_f = A*data_15 - B*data_7
             R[n_t,n_f,:] = R_uv(np.mean(data_f,0), Ek, Zk, tau_e, Lt)
             R_b[n_t,n_f,:,:] = R_uv(Bootstrap(data_f, 4, 0).T, Ek, Zk, tau_e, Lt).T
@@ -264,11 +265,14 @@ def Fit_cov(fun, x, meandata, bootsdata, boots=True, mini=True, shrinkage=0, tol
                 results.append(result.x)
             else :
                 result, _ = opt.curve_fit(fun, x, bootsdata[:, i], p0=p0, sigma=cov_matrix, maxfev=maxfev, bounds=minimize_to_curve_fit(bounds))
-                red_chi_square = chisqfun(result) / (len(meandata) - len(x0))
+                red_chi_square = 0
                 results.append(result)
             chi_squares.append(red_chi_square)
             if shows == True:    
-                progress_bar(i, len(bootsdata[0]))                            
+                progress_bar(i, len(bootsdata[0]))
+        if shows == True:
+            print(f"erro: {Bootstrap_erro(np.array(results))}")
+            print("fin")
     return Pair(res=main_result, chi=main_chi_square, chi_aic=main_chi_square*(len(meandata) - len(x0)), boots_res=np.array(results), boots_chi=chi_squares, x0=x0 , x=x, lambdas=lambdas)
 
 def Fit_cov_AIC(fun, x, meandata, bootsdata, boots=True, mini=True, shrinkage=0, tol=1e-10, p0=[1e-5], maxfev=1e5, bounds=[(-np.inf,np.inf)], x0=None, Method='Nelder-Mead', shows=True, min_subset_size=None):
@@ -287,6 +291,7 @@ def Fit_cov_AIC(fun, x, meandata, bootsdata, boots=True, mini=True, shrinkage=0,
     print("Start fitting")
     start_time = time.time()
     for start in range(0, num_points - min_subset_size + 1):
+        progress_bar(start, len(range(0, num_points - min_subset_size + 1)))
         for end in range(start + min_subset_size - 1, num_points):
             subsets_to_fit.append(list(range(start, end + 1)))
             fit = Fit_cov(fun, x[start: end + 1], meandata[start: end + 1], bootsdata[start: end + 1, :], boots=False, mini=True, shrinkage=shrinkage, tol=tol, p0=p0, maxfev=maxfev, bounds=bounds, x0=None, Method=Method, shows=False)
@@ -300,7 +305,7 @@ def Fit_cov_AIC(fun, x, meandata, bootsdata, boots=True, mini=True, shrinkage=0,
     best_subset = subsets_to_fit[max_AIC_index]
     best_range = x[best_subset]
     print(f"AIC range: {best_range[0]} to {best_range[-1]}")
-    best_fit = Fit_cov(fun, x[best_subset], meandata[best_subset], bootsdata[best_subset], boots=True, mini=True, shrinkage=shrinkage, tol=tol, p0=p0, maxfev=maxfev, bounds=bounds, x0=None, Method=Method, shows=True)
+    best_fit = Fit_cov(fun, x[best_subset], meandata[best_subset], bootsdata[best_subset], boots=boots, mini=True, shrinkage=shrinkage, tol=tol, p0=p0, maxfev=maxfev, bounds=bounds, x0=None, Method=Method, shows=True)
     best_result = best_fit.res
     best_chi_square = best_fit.chi
     best_boots_reslut = best_fit.boots_res
@@ -724,16 +729,16 @@ def Plot(data,erro=None,origin=[0,1],x=None,xshift=0,Title='',Xlabel='',Ylabel='
                     Label = [Label[0] for i in range(data.shape[0])]
             for i in range(data.shape[0]):
                 if Label != '':
-                    ax.errorbar(xdata+i*dx,data[i],erro[i],linestyle=Line,marker=Mark,ms=4,label=Label[i])
+                    ax.errorbar(xdata+i*dx,data[i],erro[i],linestyle=Line,marker=Mark,ms=5,label=Label[i])
                 else:
-                    ax.errorbar(xdata+i*dx,data[i],erro[i],linestyle=Line,marker=Mark,ms=4,label=Label)
+                    ax.errorbar(xdata+i*dx,data[i],erro[i],linestyle=Line,marker=Mark,ms=5,label=Label)
         elif d == 1:
-            ax.errorbar(xdata,data,erro,linestyle=Line,marker=Mark,ms=2,label=Label)
+            ax.errorbar(xdata,data,erro,linestyle=Line,marker=Mark,ms=5,label=Label)
     elif erro.all() == None:
         xdata = np.linspace(origin[0]*np.ones(1),(origin[0] + origin[1]*(data.T.shape[0] - 1))*np.ones(1),data.T.shape[0],axis= 1)
         if x.all() != None:
             xdata = x
-        ax.plot(xdata.T,data.T,linestyle=Line,marker=Mark,ms=2,label=Label)
+        ax.plot(xdata.T,data.T,linestyle=Line,marker=Mark,ms=5,label=Label)
     if Xlimt != None:
         plt.xlim(Xlimt)
     if Ylimt != None:

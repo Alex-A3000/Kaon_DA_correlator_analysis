@@ -27,23 +27,46 @@ def con_fun(x, *a):
 def exp_fun(x,*a):
     return a[0] + a[1]*np.exp(-1*a[2]*x)
 
+def ExcitedStateContamination(x,data,data_b,tau):
+    # if tau > 0:
+    #     bounds = [(0,np.inf)]
+    #     p0 = [1e-5]
+    #     return tb.Fit_cov_AIC(con_fun, x, data, data_b, bounds=bounds, p0=p0, min_subset_size=3)
+    # else :
+    #     bounds = [(0,np.inf), (-np.inf,np.inf), (0,np.inf)]
+    #     p0 = [1e-5,1e-5,1e-5]
+    #     return tb.Fit_cov_AIC(exp_fun, x, data, data_b, bounds=bounds, p0=p0)
+    bounds = [(0,np.inf)]
+    p0 = [1e-5]
+    return tb.Fit_cov_AIC(con_fun, x, data, data_b, bounds=bounds, p0=p0, min_subset_size=2)
+    # bounds = [(0,np.inf)]
+    # p0 = [1e-5]
+    # A1 = tb.Fit_cov_AIC(con_fun, x, data, data_b, bounds=bounds, p0=p0, min_subset_size=3)
+    # bounds = [(0,np.inf), (0,np.inf), (0,np.inf)]
+    # p0 = [1e-5,1e-5,1e-5]
+    # A2 = tb.Fit_cov_AIC(exp_fun, x, data, data_b, bounds=bounds, p0=p0)
+    # if A1.chi > A2.chi:
+    #     return A2
+    # else:
+    #     return A1
+
 List = [
     ["B451", 500, 0.136981, 0.136409, 64,  [10, 12, 14, 16], 0.075, 32],
-    ["B452", 400, 0.137045, 0.136378, 64,  [10, 12, 14, 16], 0.075, 32],
+    ["B452", 400, 0.137045, 0.136378, 64,  [4, 6, 8, 10, 12, 14, 16], 0.075, 32],
     ["N450", 280, 0.137099, 0.136353, 128, [10, 12, 14, 16], 0.075, 48],
     ["N304", 420, 0.137079, 0.136665, 128, [15, 18, 21, 24], 0.049, 48],
     ["N305", 250, 0.137025, 0.136676, 128, [15, 18, 21, 24], 0.049, 48],
 ]
 fminv_to_GEV = 1/5.068
-i = 0
+i = 1
 latt_space = List[i][6]
 Lx = List[i][7]
 Ntau = 30
 cutdata = 0
 bounds = [(-np.inf,np.inf), (0,np.inf), (0,np.inf)]
 p0 = [1e-5,1e-5,1e-5]
-bounds = [(0,np.inf)]
-p0 = [1e-5]
+# bounds = [(0,np.inf)]
+# p0 = [1e-5]
 conf_name = List[i][0]
 Lt = List[i][4]
 Nconf = List[i][1]
@@ -59,7 +82,7 @@ k_space = np.linspace(-q_max, q_max, 2*r+1)
 fit_range = 9
 k_space = k_space[int(len(k_space)/2+1/2)-1-fit_range:int(len(k_space)/2+1/2)+fit_range]
 k_spaces = np.linspace(k_space[0], k_space[-1], 2*r + 1)
-t_spaces = np.linspace(Itau, Ntau-1, 2*r)
+t_spaces = np.linspace(Itau, Ntau-1, 10*r)
 
 # load the fitting result
 dir = "kaon_result/"
@@ -72,8 +95,8 @@ eigenvectors = fitting_result["eigenvector"]
 OPfitting_exponential = fitting_result["exponential"]
 #define the directory of input data
 three_pt_dir = conf_name + "/"
-kappa_hs = ["0.104000"]#,"0.115000","0.124500"]
-tau_es = List[i][5]
+kappa_hs = ["0.115000"]#,"0.115000","0.124500"]
+tau_es = np.array(List[i][5])
 R_im_odd, R_re_odd, R_im_eve, R_re_eve = [np.zeros((len(kappa_hs), Ntau)).tolist() for _ in range(4)]
 MR_im_odd, MR_re_odd, MR_im_eve, MR_re_eve = [np.zeros((len(kappa_hs), Ntau)).tolist() for _ in range(4)]
 BR_im_odd, BR_re_odd, BR_im_eve, BR_re_eve = [np.zeros((len(kappa_hs), Ntau)).tolist() for _ in range(4)]
@@ -97,10 +120,10 @@ for i, kappa_h in enumerate(kappa_hs):
             Odd_re_b[i][tau][t_e] = -1*three_pt_data.re_odd_b[t_e][0][:,-tau]
             Even_re_b[i][tau][t_e] = -1*three_pt_data.re_even_b[t_e][0][:,-tau]
         if tau >= cutdata-1:
-            R_re_odd[i][tau] = tb.Fit_cov_AIC(con_fun, np.array(tau_es)[:], Odd_re[i][tau][:], Odd_re_b[i][tau][:][:], bounds=bounds, p0=p0)
-            R_re_eve[i][tau] = tb.Fit_cov_AIC(con_fun, np.array(tau_es)[:], Even_re[i][tau][:], Even_re_b[i][tau][:][:], bounds=bounds, p0=p0)
-            R_im_odd[i][tau] = tb.Fit_cov_AIC(con_fun, np.array(tau_es)[:], Odd_im[i][tau][:], Odd_im_b[i][tau][:][:], bounds=bounds, p0=p0)
-            R_im_eve[i][tau] = tb.Fit_cov_AIC(con_fun, np.array(tau_es)[:], Even_im[i][tau][:], Even_im_b[i][tau][:][:], bounds=bounds, p0=p0)
+            R_re_odd[i][tau] = ExcitedStateContamination(tau_es, Odd_re[i][tau][:], Odd_re_b[i][tau][:][:], tau)
+            R_re_eve[i][tau] = ExcitedStateContamination(tau_es, Even_re[i][tau][:], Even_re_b[i][tau][:][:], tau)
+            R_im_odd[i][tau] = ExcitedStateContamination(tau_es, Odd_im[i][tau][:], Odd_im_b[i][tau][:][:], tau)
+            R_im_eve[i][tau] = ExcitedStateContamination(tau_es, Even_im[i][tau][:], Even_im_b[i][tau][:][:], tau)
 
             MR_re_odd[i][tau] = R_re_odd[i][tau].res[0]
             MR_re_eve[i][tau] = R_re_eve[i][tau].res[0]
@@ -287,8 +310,8 @@ def runing_alpha_s(mu=2, Lambda_QCD=0.3, nf=4, order='LO'):
 '''Momentum Space Fitting form'''
 CF = 4/3 # Nc**2 - 1 / 2*Nc
 mu = 2 /fminv_to_GEV *latt_space # renormalization scale 2GeV
-#alpha_s = runing_alpha_s(mu,order='NLO')# coupling constant 0.3
-alpha_s = 0.3
+#alpha_s = runing_alpha_s(mu,order='NLO')
+alpha_s = 0.2
 
 Ek = OPfitting_exponential[1].best_fit.res[0]
 p_square_3d = 1 *2 *np.pi /Lx *2 *np.pi /Lx
@@ -476,12 +499,22 @@ def TR_fitting_V_odd_re_sub(q4, *a):
 """Time Momentum Space Fitting form (integrated ver)"""
 from scipy.integrate import quad
 from joblib import Parallel, delayed
-n_jobs = 10 # n nodes
-int_limit = np.pi
-quad_limit = 100
+n_jobs = 12 # n nodes
+int_limit = np.inf
+int_limit = 100*np.pi
+quad_limit = 10000
+cutoff = 1e-17
+truncation = 1e7
 
-def OL_fitting_R_even_im_scalar(tau, *a): 
-    integrand = lambda q4: np.cos(q4 * tau) * OL_fitting_V_even_im(q4, *a)
+def OL_fitting_R_even_im_scalar(tau, *a):
+    def integrand(q4):
+        val = OL_fitting_V_even_im(q4, *a)
+        if not np.isfinite(val) or abs(val) < cutoff:
+            return 0.0
+        if  q4*tau > truncation:
+            return 0.0
+        else :
+            return np.cos(q4 * tau) * val
     result, error = quad(integrand, -int_limit, int_limit, limit=quad_limit)
     return result / (2 * np.pi)
 
@@ -491,8 +524,15 @@ def OL_fitting_R_even_im(taus, *a,):
     )
     return np.array(results)
 
-def TR_fitting_R_even_im_scalar(tau, *a): 
-    integrand = lambda q4: np.cos(q4 * tau) * TR_fitting_V_even_im(q4, *a)
+def TR_fitting_R_even_im_scalar(tau, *a):
+    def integrand(q4):
+        val = TR_fitting_V_even_im(q4, *a)
+        if not np.isfinite(val) or abs(val) < cutoff:
+            return 0.0
+        if  q4*tau > truncation:
+            return 0.0
+        else :
+            return np.cos(q4 * tau) * val
     result, error = quad(integrand, -int_limit, int_limit, limit=quad_limit)
     return result / (2 * np.pi)
 
@@ -506,13 +546,142 @@ def TR_fitting_R_even_im(taus, *a,):
 
 def TR_fourier_R_even_im(t, *a):
     f_M, M_phi = a[0], a[1]
-    A = 2*1j*Ek*q3*f_M
-    phi = q_square_3d + M_phi**2
+    A = 2*Ek*q3*f_M
+    phi = (q_square_3d + M_phi**2)**0.5
     C0 = (A/2/phi)*np.exp(-phi*t)
-    return C0.imag
+    return C0
 
+def OL_fitting_V_q_even(q4, *a):
+    f_M, M_phi, mom2 = a[0], a[1], a[2]
+    pq = 1j*q4*Ek - pq_3d
+    p_square =  Ek**2 - p_square_3d
+    q_square = -q4**2 - q_square_3d
+    Q2 = -q_square + M_phi**2
+    tau = -q_square /Q2
+    omega2 = replacing_omega(2, pq, p_square, q_square, Q2, replacing=False)
+    return One_Loop_V_even(f_M, mom2, q3, pq, p_square, q_square, Q2, mu, tau, omega2, alpha_s, CF)
+
+def OL_fitting_V_q_even_q4_even(q4, *a):
+    return (OL_fitting_V_q_even(q4, *a) + OL_fitting_V_q_even(-q4, *a)) / 2
+
+def OL_fitting_V_q_even_q4_odd(q4, *a):
+    return (OL_fitting_V_q_even(q4, *a) - OL_fitting_V_q_even(-q4, *a)) / 2
+
+def OL_fitting_V_q_odd(q4, *a):
+    f_M, M_phi, mom1, mom3 = a[0], a[1], a[2], a[3]
+    pq = 1j*q4*Ek - pq_3d
+    p_square =  Ek**2 - p_square_3d
+    q_square = -q4**2 - q_square_3d
+    Q2 = -q_square + M_phi**2
+    tau = -q_square /Q2
+    omega1 = replacing_omega(1, pq, p_square, q_square, Q2, replacing=False)
+    omega2 = replacing_omega(2, pq, p_square, q_square, Q2, replacing=False)
+    omega3 = replacing_omega(3, pq, p_square, q_square, Q2, replacing=False)
+    return One_Loop_V_odd(f_M, mom1, mom3, q3, pq, p_square, q_square, Q2, mu, tau, omega1, omega2, omega3, alpha_s, CF)
+
+def OL_fitting_V_q_odd_q4_even(q4, *a):
+    return (OL_fitting_V_q_odd(q4, *a) + OL_fitting_V_q_odd(-q4, *a)) / 2
+
+def OL_fitting_V_q_odd_q4_odd(q4, *a):
+    return (OL_fitting_V_q_odd(q4, *a) - OL_fitting_V_q_odd(-q4, *a)) / 2
+
+def TR_fitting_V_q_even(q4, *a):
+    f_M, M_phi, mom2 = a[0], a[1], a[2]
+    pq = 1j*q4*Ek - pq_3d
+    p_square =  Ek**2 - p_square_3d
+    q_square = -q4**2 - q_square_3d
+    Q2 = -q_square + M_phi**2
+    tau = -q_square /Q2
+    omega2 = replacing_omega(2, pq, p_square, q_square, Q2, replacing=False)
+    return Tree_Level_V_even(f_M, mom2, q3, pq, p_square, q_square, Q2, mu, tau, omega2, alpha_s, CF)
+
+def TR_fitting_V_q_even_q4_even(q4, *a):
+    return (TR_fitting_V_q_even(q4, *a) + TR_fitting_V_q_even(-q4, *a)) / 2
+
+quad_limit = 10000
+
+def complex_integral(f, a, b, **kwargs):
+    real_part = quad(lambda x: np.real(f(x)), a, b, **kwargs)[0]
+    imag_part = quad(lambda x: np.imag(f(x)), a, b, **kwargs)[0]
+    return real_part + 1j * imag_part
+
+# === COS scalar integrand ===
+def C_Integrand_cos_scalar(tau, Q, fun, *a):
+    int_limit_1 = Q
+    int_limit_2 = np.inf
+
+    def integrand_1(q4):
+        val = fun(q4, *a).imag
+        return np.cos(q4 * tau) * val
+
+    result_1 = quad(integrand_1, 0, int_limit_1, limit=quad_limit)[0]
+
+    def integrand_2(q4):
+        return np.exp(-q4 * tau) * fun(Q + 1j * q4, *a).imag
+
+    result_2 = complex_integral(integrand_2, 0, int_limit_2, limit=quad_limit)
+
+    return (result_1 + (1j * np.exp(1j * Q * tau) * result_2).real) / (2 * np.pi)
+
+def C_Integrand_cos(taus, Q, fun, *a):
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(C_Integrand_cos_scalar)(tau, Q, fun, *a) for tau in taus
+    )
+    return np.array(results)
+
+# === SIN scalar integrand ===
+def C_Integrand_sin_scalar(tau, Q, fun, *a):
+    int_limit_1 = Q
+    int_limit_2 = np.inf
+
+    def integrand_1(q4):
+        val = fun(q4, *a)
+        return np.sin(q4 * tau) * val
+
+    result_1 = 1j * quad(integrand_1, 0, int_limit_1, limit=quad_limit)[0]
+
+    def integrand_2(q4):
+        return np.exp(-q4 * tau) * fun(Q + 1j * q4, *a)
+
+    result_2 = complex_integral(integrand_2, 0, int_limit_2, limit=quad_limit)
+
+    return (result_1 + (np.exp(1j * Q * tau) * result_2).imag) / (2 * np.pi)
+
+def C_Integrand_sin(taus, Q, fun, *a):
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(C_Integrand_sin_scalar)(tau, Q, fun, *a) for tau in taus
+    )
+    return np.array(results)
+
+# === FULL scalar integrand ===
+def C_Integrand_scalar(tau, Q, fun, *a):
+    int_limit_1 = Q
+    int_limit_2 = np.inf
+
+    def integrand_1(q4):
+        return np.exp(1j * q4 * tau) * fun(q4, *a)
+
+    result_1 = complex_integral(integrand_1, -int_limit_1, int_limit_1, limit=quad_limit)
+
+    def integrand_2(q4):
+        return np.exp(-q4 * tau) * fun(Q + 1j * q4, *a)
+
+    def integrand_3(q4):
+        return np.exp(-q4 * tau) * fun(-Q + 1j * q4, *a)
+
+    result_2 = complex_integral(integrand_2, 0, int_limit_2, limit=quad_limit)
+    result_3 = complex_integral(integrand_3, 0, int_limit_2, limit=quad_limit)
+
+    return (result_1 + 1j * np.exp(1j * Q * tau) * result_2 - 1j * np.exp(-1j * Q * tau) * result_3) / (2 * np.pi)
+
+def C_Integrand(taus, Q, fun, *a):
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(C_Integrand_scalar)(tau, Q, fun, *a) for tau in taus
+    )
+    return np.array(results)
+    
 #%%
-reset = 0
+reset = 1
 if reset==0:
     TR_fit = list(np.zeros(4))
     OL_fit = list(np.zeros(4))
@@ -542,6 +711,7 @@ ax.plot(k_space, OL_fitting_V_even_im_sub(k_space,*OL_fit[0].res), linestyle='',
         label=f"one loop\n$\chi^2$: {OL_fit[0].chi:.2e}" + 
         "\n$f_k$: " + f"{OL_fit[0].res[0]:.3e} +- {tb.Bootstrap_erro(OL_fit[0].boots_res[:,0]):.3e}" + 
         "\n$m_{\Psi}$: " + f"{OL_fit[0].res[1]:.3e} +- {tb.Bootstrap_erro(OL_fit[0].boots_res[:,1]):.3e}")
+
 plt.legend(loc=0)
 # Tree-level band
 tree_vals = np.array([TR_fitting_V_even_im_sub(k_spaces, *params) for params in TR_fit[0].boots_res])
@@ -557,33 +727,101 @@ ax.plot(k_spaces, one_loop_mean, color='C2')
 ax.fill_between(k_spaces, one_loop_mean - one_loop_std, one_loop_mean + one_loop_std, color='C2', alpha=0.2)
 plt.show()    
 #%%
-TR_fit_R[0] = TR_fit[0]
-OL_fit_R[0] = OL_fit[0]
+fit_data = np.array(MR_im_eve[h])
+fit_data_b = np.array(BR_im_eve[h])
+p0 = [1e-5, 1e-5]
+bounds= [(0,100),(0,100)]
+tree_level_res = tb.Fit_cov_AIC(TR_fourier_R_even_im, t_space, fit_data, fit_data_b, p0=p0, bounds=bounds)
+ini, fin = 1, 15
+fit_data = np.array(MR_im_eve[h])
+fit_data_b = np.array(BR_im_eve[h])
+def R_q_even_q4_even(taus,*a):
+    return C_Integrand(taus, 0.25, OL_fitting_V_q_even_q4_even, *a).imag
+p0 = [0.01, 0.01, 1e-7,]
+bounds= [(0,100),(0,100),(0,0.25),]
+#OL_fit_R[0] = tb.Fit_cov(R_q_even_q4_even, t_space[ini:fin], fit_data[ini:fin], fit_data_b[ini:fin], mini=1,p0=p0, bounds=bounds)
+OL_fit_R[0] = tb.Fit_cov_AIC(R_q_even_q4_even, t_space[ini:fin], fit_data[ini:fin], fit_data_b[ini:fin], p0=p0, bounds=bounds)
+#%%
+Q = 1
+# TR_fit_R[0] = TR_fit[0]
+# OL_fit_R[0] = OL_fit[0]
 fit_data = np.array(MR_im_eve[h])
 fit_data_b = np.array(BR_im_eve[h])
 fig, ax = plt.subplots(1, 1, figsize=(9, 6), dpi=150)
 plt.grid(color='gray', linestyle='--', linewidth=1)
-plt.title(f"$R_{{even,Im}}$ for {conf_name} kappa_h={kappa_hs[h]}")
-ax.errorbar(t_space, fit_data, tb.Bootstrap_erro(fit_data_b,1), linestyle='-', marker='s', ms=4, label="data")
-ax.plot(t_space, TR_fitting_R_even_im(t_space,*TR_fit[0].res), linestyle='', marker='o', ms=4,
-        label=f"tree level\n$\chi^2$: {TR_fit[0].chi:.2e}" + 
-        "\n$f_k$: " + f"{TR_fit[0].res[0]:.3e} +- {tb.Bootstrap_erro(TR_fit[0].boots_res[:,0]):.3e}" + 
-        "\n$m_{\Psi}$: " + f"{TR_fit[0].res[1]:.3e} +- {tb.Bootstrap_erro(TR_fit[0].boots_res[:,1]):.3e}")
-ax.plot(t_space, OL_fitting_R_even_im(t_space,*OL_fit[0].res), linestyle='', marker='x', ms=4,
-        label=f"one loop\n$\chi^2$: {OL_fit[0].chi:.2e}" + 
-        "\n$f_k$: " + f"{OL_fit[0].res[0]:.3e} +- {tb.Bootstrap_erro(OL_fit[0].boots_res[:,0]):.3e}" + 
-        "\n$m_{\Psi}$: " + f"{OL_fit[0].res[1]:.3e} +- {tb.Bootstrap_erro(OL_fit[0].boots_res[:,1]):.3e}")
+plt.title(f"$R_{{even,Im}}$ for {conf_name} kappa_h={kappa_hs[h]}, Q ={Q}")
+ax.errorbar(t_space, fit_data, tb.Bootstrap_erro(fit_data_b,1), linestyle='', marker='s', ms=4, label="data")
+# ax.plot(t_space, R_q_even_q4_even(t_space, 0.04583436, 1.02269361, 3*0.16148353), linestyle='', marker='o', ms=4, label="one loop (NUMERICALINTEGRATION)")
+ax.plot(t_space, TR_fourier_R_even_im(t_space,*tree_level_res.res), linestyle='--', marker='', label="tree level (ANALYTICS)")
 plt.legend(loc=0)
-# Tree-level band
-tree_vals = np.array([TR_fitting_R_even_im(t_spaces, *params) for params in TR_fit[0].boots_res])
-tree_mean = TR_fitting_R_even_im(t_spaces,*TR_fit[0].res)
-tree_std = tb.Bootstrap_erro(tree_vals, 0)
-ax.plot(t_spaces, tree_mean, color='C1')
-ax.fill_between(t_spaces, tree_mean - tree_std, tree_mean + tree_std, color='C1', alpha=0.2)
-# One-loop band
-one_loop_vals = np.array([OL_fitting_R_even_im(t_spaces, *params) for params in OL_fit[0].boots_res])
-one_loop_mean = OL_fitting_R_even_im(t_spaces,*OL_fit[0].res)
-one_loop_std = tb.Bootstrap_erro(one_loop_vals, 0)
-ax.plot(t_spaces, one_loop_mean, color='C2')
-ax.fill_between(t_spaces, one_loop_mean - one_loop_std, one_loop_mean + one_loop_std, color='C2', alpha=0.2)
-plt.show() 
+# # Tree-level band
+# tree_vals = np.array([TR_fitting_R_even_im(t_spaces, *params) for params in TR_fit[0].boots_res[:100]])
+# tree_mean = TR_fitting_R_even_im(t_spaces,*TR_fit[0].res)
+# tree_std = tb.Bootstrap_erro(tree_vals, 0)
+# ax.plot(t_spaces, tree_mean, color='C1')
+# ax.fill_between(t_spaces, tree_mean - tree_std, tree_mean + tree_std, color='C1', alpha=0.2)
+# # One-loop band
+# one_loop_vals = np.array([OL_fitting_R_even_im(t_spaces, *params) for params in OL_fit[0].boots_res[:100]])
+# one_loop_mean = OL_fitting_R_even_im(t_spaces,*OL_fit[0].res)
+# one_loop_std = tb.Bootstrap_erro(one_loop_vals, 0)
+# ax.plot(t_spaces, one_loop_mean, color='C2')
+# ax.fill_between(t_spaces, one_loop_mean - one_loop_std, one_loop_mean + one_loop_std, color='C2', alpha=0.2)
+plt.show()
+#%%
+fit_data = np.array(MR_im_eve[h])
+fit_data_b = np.array(BR_im_eve[h])
+fig, ax = plt.subplots(1, 1, figsize=(9, 6), dpi=150)
+plt.grid(color='gray', linestyle='--', linewidth=1)
+ax.errorbar(t_space, fit_data, tb.Bootstrap_erro(fit_data_b,1), linestyle='-', marker='s', ms=4, label="data")
+ax.plot(t_spaces, TR_fourier_R_even_im(t_spaces,*tree_level_res.res), linestyle='--', marker='', label="tree level (ANALYTICS)")
+for Q in [0.25,0.5,1,2,4,8,16,32,64]:
+    ax.plot(t_spaces + 0.001*Q, C_Integrand(t_spaces, Q, OL_fitting_V_q_even_q4_even, *OL_fit[0].res).imag, linestyle='', marker='x', ms=4, label=f"one loop (NUMERICALINTEGRATION) Q={Q}")
+    #ax.plot(t_spaces + 0.001*Q, C_Integrand(t_spaces, Q, TR_fitting_V_q_even_q4_even, *tree_level_res.res, 0).imag, linestyle='', marker='x', ms=4, label=f"tree level (NUMERICALINTEGRATION) Q={Q}")
+plt.legend(loc=0)
+plt.show()
+#%%
+# TR_fit_R[0] = TR_fit[0]
+# OL_fit_R[0] = OL_fit[0]
+# fit_data = np.array(MR_im_eve[h])
+# fit_data_b = np.array(BR_im_eve[h])
+# fig, ax = plt.subplots(1, 1, figsize=(9, 6), dpi=150)
+# plt.grid(color='gray', linestyle='--', linewidth=1)
+# plt.title(f"$R_{{even,Im}}$ for {conf_name} kappa_h={kappa_hs[h]}")
+# ax.errorbar(t_space, fit_data, tb.Bootstrap_erro(fit_data_b,1), linestyle='-', marker='s', ms=4, label="data")
+# ax.plot(t_space, TR_fitting_R_even_im(t_space,*TR_fit[0].res), linestyle='--', marker='o', ms=4, label="tree level (NUMERICALINTEGRATION)")
+# ax.plot(t_space, OL_fitting_R_even_im(t_space,*OL_fit[0].res), linestyle='-.', marker='x', ms=4, label="one loop (NUMERICALINTEGRATION)")
+# ax.plot(t_space, TR_fourier_R_even_im(t_space,*TR_fit[0].res), linestyle='', marker='o', ms=4, label="tree level")
+# plt.legend(loc=0)
+# plt.show()
+#%%
+import matplotlib.pyplot as plt
+
+# Example data (replace with your actual data)
+subset_index = list(range(406))
+fit_result = [np.array(tree_level_res.all_results)[:,1]]  # your fit result data, len=400
+chi_squared = [tree_level_res.all_chi_square]  # your chi^2 data, len=400
+
+fig, ax1 = plt.subplots(figsize=(12, 6))
+
+# First y-axis (left): fit result
+ax1.scatter(subset_index, fit_result, marker='s', s=10, color='tab:blue', label='Fit Result (Time-Momentum space)')
+ax1.set_ylabel('Fit Result', color='tab:blue', fontsize=18)
+ax1.tick_params(axis='y', labelcolor='tab:blue', labelsize=14)
+ax1.fill_between(subset_index, TR_fit[0].res[1] - tb.Bootstrap_erro(TR_fit[0].boots_res[:,1]),  TR_fit[0].res[1] + tb.Bootstrap_erro(TR_fit[0].boots_res[:,1]), alpha=0.8, label='Fit Result (Momentum space)')
+ax1.set_ylim(1, 1.5)
+#ax1.set_ylim(0, 1e-2)
+plt.legend(loc=0)
+# Second y-axis (right): chi^2
+ax2 = ax1.twinx()
+#ax2.scatter(subset_index, chi_squared, marker='x', s=10, color='tab:red', label='Chi²')
+ax2.bar(subset_index, np.array(chi_squared)[0], width=1.0, color='tab:red', alpha=0.2)
+ax2.set_ylabel('Chi²', color='tab:red', fontsize=18)
+ax2.tick_params(axis='y', labelcolor='tab:red', labelsize=14)
+ax2.set_ylim(0, 1)
+# Shared x-axis
+ax1.set_xlabel('Subset Index', fontsize=18)
+plt.title('Fit Result and Chi² vs Subset Index', fontsize=18)
+ax1.tick_params(axis='x', labelsize=14)
+fig.tight_layout()
+
+plt.show()
